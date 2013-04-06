@@ -1,11 +1,14 @@
 package org.eclipse.ui.texteditor;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -33,7 +36,6 @@ public class MyGemFunctions
 	{
 		// TODO:  Get this to actually parse the damned ruby file currently open... check window.getOpenFiles() or something... I saw that somewhere
 		// Get active file...
-		String projectFolderName = getProjectFolderName();
 		String activeFilesSrc = getActiveFilesText();
 		
 		List<String> requireReferences = retrieveRequireReferences("require", activeFilesSrc);
@@ -45,7 +47,7 @@ public class MyGemFunctions
 		String[] requiredFiles = requireReferences.toArray(new String[hitsCount]);
 		for (int i = 0; i < requireRelativeReferences.size(); i++){
 			int j = i + requireReferences.size();
-			requiredFiles[j] = projectFolderName + File.separator + requireRelativeReferences.get(i);
+			requiredFiles[j] = requireRelativeReferences.get(i);
 		}
 		
 		return requiredFiles;
@@ -86,6 +88,7 @@ public class MyGemFunctions
 		// gems folder...
 		String[] requireFilePaths = new String[requiredFiles.length];
 		String absolutePathToProjectsParent = getAbsolutePathOfProjectsParentFolder();
+		String gemsDirectory = getGemsDirectory();
 		
 		for (int i = 0; i < requiredFiles.length; i++){
 			String relativePath = requiredFiles[i];
@@ -96,11 +99,51 @@ public class MyGemFunctions
 			}
 			else{ // check in the lib folder of the current app... in case we're building a gem...  Also...
 				// check the gems folder
-				Process cmdProc = Runtime.getRuntime().exec("which ruby");
+				
 			}
 		}
 		
 		return requireFilePaths;
+	}
+	
+	public static String getGemsDirectory()
+	{
+		try
+		{
+			Process proc = Runtime.getRuntime().exec("which ruby");
+			
+			BufferedReader stdInput = new BufferedReader(new 
+											InputStreamReader(proc.getInputStream()));
+
+			BufferedReader stdError = new BufferedReader(new 
+											InputStreamReader(proc.getErrorStream()));
+        	
+			
+			String s;
+			String commandOutput = "";
+			// read the output from the command
+			System.out.println("Here is the standard output of the command:\n");
+			while ((s = stdInput.readLine()) != null) {
+				//System.out.println(s);
+				commandOutput += s;
+			}
+			
+			// read any errors from the attempted command
+			System.out.println("Here is the standard error of the command (if any):\n");
+			while ((String s = stdError.readLine()) != null) {
+				//System.out.println(s);
+				commandOutput += s;
+			}
+			
+			int statusCode = proc.exitValue();
+			return commandOutput;
+		}
+		catch (IOException e)
+		{
+			// TODO Auto-generated catch block
+			e.printStackTrace(); 
+			return "";
+		}
 	}
 
 	public static IDocument[] pullUpSourceFilesAsIDocuments(String[] requiredFilesPaths)
