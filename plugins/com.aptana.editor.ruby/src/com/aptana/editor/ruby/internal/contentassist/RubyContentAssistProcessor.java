@@ -25,6 +25,7 @@ import org.eclipse.jface.text.ITextViewer;
 import org.eclipse.jface.text.contentassist.ICompletionProposal;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.ui.texteditor.HippieProposalProcessor;
+import org.eclipse.ui.texteditor.HippieProposalProcessorGems;
 import org.jruby.Ruby;
 import org.jrubyparser.ast.ClassNode;
 import org.jrubyparser.ast.ClassVarAsgnNode;
@@ -117,6 +118,7 @@ public class RubyContentAssistProcessor extends CommonContentAssistProcessor
 		return super.addRubleCAProposals(viewer, offset, ruby, ce);
 	};
 
+	@SuppressWarnings("unchecked")
 	@Override
 	protected ICompletionProposal[] doComputeCompletionProposals(ITextViewer viewer, int offset, char activationChar,
 			boolean autoActivated)
@@ -189,15 +191,28 @@ public class RubyContentAssistProcessor extends CommonContentAssistProcessor
 			}
 			else if (fContext.isMethodInvokationOrLocal())
 			{
+				// FIXME:  Make this actually work for method calls...
+				Collection<? extends ICompletionProposal> blah1, blah2, blah3;
+				blah1 = suggestKeywords();
 				proposals.addAll(suggestKeywords());
+				
 				// JDT suggests locals, then methods
+				blah2 = suggestLocalVariables();
 				proposals.addAll(suggestLocalVariables());
+				
+				blah3 = suggestMethodsForEnclosingType();
 				proposals.addAll(suggestMethodsForEnclosingType());
+				
 				// Add word completions to round it out
 				// Don't suggest duplicates of methods/locals suggested!
 				Collection<? extends ICompletionProposal> wordCompletions = suggestWordCompletions(viewer, offset);
 				wordCompletions = removeDuplicates(proposals, wordCompletions);
 				proposals.addAll(wordCompletions);
+				
+				// My ugly hacks to make gem searching work
+				Collection<? extends ICompletionProposal> wordCompletionsGems = suggestWordCompletionsFromGems(viewer, offset);
+				wordCompletionsGems = removeDuplicates(proposals, wordCompletionsGems); // this is bugged now, duplicates across wordCompletions and wordCompletionsGems are possible... FIXME
+				proposals.addAll(wordCompletionsGems);
 			}
 			sortByDisplayName(proposals);
 			return proposals.toArray(new ICompletionProposal[proposals.size()]);
@@ -235,7 +250,7 @@ public class RubyContentAssistProcessor extends CommonContentAssistProcessor
 		if (receiverIsType)
 		{
 			// TODO Insert the class name as the "location"?
-			proposals.add(createProposal("new", RubyEditorPlugin.getImage(PUBLIC_METHOD_IMAGE))); //$NON-NLS-1$
+			proposals.add(createProposal("new_chunky_bacon", RubyEditorPlugin.getImage(PUBLIC_METHOD_IMAGE))); //$NON-NLS-1$
 		}
 		return proposals;
 	}
@@ -511,12 +526,26 @@ public class RubyContentAssistProcessor extends CommonContentAssistProcessor
 
 	protected Collection<? extends ICompletionProposal> suggestWordCompletions(ITextViewer viewer, int offset)
 	{
+		// FIXME:  Interesting
 		ICompletionProposal[] hippieProposals = new HippieProposalProcessor()
-				.computeCompletionProposals(viewer, offset);
+		.computeCompletionProposals(viewer, offset);
 		if (hippieProposals == null || hippieProposals.length == 0)
 		{
 			return Collections.emptyList();
 		}
+		return Arrays.asList(hippieProposals);
+	}
+	
+	protected Collection<? extends ICompletionProposal> suggestWordCompletionsFromGems(ITextViewer viewer, int offset)
+	{
+		// FIXME:  Interesting
+		ICompletionProposal[] hippieProposals = new HippieProposalProcessorGems()
+		.computeCompletionProposals(viewer, offset);
+		if (hippieProposals == null || hippieProposals.length == 0)
+		{
+			return Collections.emptyList();
+		}
+		
 		return Arrays.asList(hippieProposals);
 	}
 
