@@ -1,0 +1,23 @@
+Thanks Camilo!  Your help is 100% why this branch of code is possible.  
+
+
+RubyContentAssistProcessor.java
+doComputeCompletionProposals
+
+
+org.eclipse.ui.texteditor.HippieProposalProcessor
+
+So, an IEditorReference is basically a reference to a source code file that is actively open in the viewer for the project...  If you have 'my_file.rb' open in the background, you'll have an extra IEditorReference with a ToolTip of "project_folder_name/file_path" when it goes looking for suggestions...  
+// IEditorReference editorReferences
+
+Creating these things is what I need to look into... Unfortunately, it seems a lot of the work is done in Eclipse, so I don't have easy access to it from within the Aptana Plugin.  
+
+
+// IEditorReference editorReferences[]= window.getActivePage().getEditorReferences();
+
+The above line of code is the exact function that takes window and gathers a list of open windows from it... if I could just hardcode it to look for something specific... that would give me something... Then I could hardcode it into the ITextViewer that gets passed into this eclipse side of things!  I can do that from within the aptana plugin!!!
+
+IDocument.fStore.fTextStore.fContent contains the text of the file.  
+
+
+

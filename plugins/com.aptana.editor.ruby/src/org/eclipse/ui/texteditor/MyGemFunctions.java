@@ -1,12 +1,20 @@
 package org.eclipse.ui.texteditor;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringWriter;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.util.List;
+import java.util.Scanner;
+import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.core.internal.filebuffers.SynchronizableDocument;
 import org.eclipse.core.resources.IFile;
@@ -25,10 +33,51 @@ public class MyGemFunctions
 	{
 		// TODO:  Get this to actually parse the damned ruby file currently open... check window.getOpenFiles() or something... I saw that somewhere
 		// Get active file...
-		String text = getActiveFilesText();
-		String[] requiredFiles = { "benchmark/methods.rb" };
+		String projectFolderName = getProjectFolderName();
+		String activeFilesSrc = getActiveFilesText();
+		
+		List<String> requireReferences = retrieveRequireReferences("require", activeFilesSrc);
+		List<String> requireRelativeReferences = retrieveRequireReferences("require_relative", activeFilesSrc);
+		
+		int hitsCount = requireReferences.size() + requireRelativeReferences.size();
+		
+		// Merges the Lists in the only way I know how...
+		String[] requiredFiles = requireReferences.toArray(new String[hitsCount]);
+		for (int i = 0; i < requireRelativeReferences.size(); i++){
+			int j = i + requireReferences.size();
+			requiredFiles[j] = projectFolderName + File.separator + requireRelativeReferences.get(i);
+		}
 		
 		return requiredFiles;
+	}
+
+	
+
+	private static List<String> retrieveRequireReferences(String searchFor, String activeFilesSrc)
+	{
+		// String yourString = "require 'methods'\n# I'm another line";
+		String[] lines = activeFilesSrc.split("\n");
+		searchFor = escapeUnderscore(searchFor);
+		// "\\s*['|\"](\\w*[._\\\\]?\\w*)['|\"]"
+		Pattern pat = Pattern.compile("^\\s*" + searchFor + "\\s*['|\"](.*)['|\"]");  // Match:  'benchmark' || 'benchmark.rb' || 'dir/benchmark.rb'
+		List<String> requireTargets = new Vector<String>();
+
+		for (int i = 0; i < lines.length; i++){
+			String line = lines[i];
+			
+			Matcher m = pat.matcher(line);
+			while (m.find()) {
+				requireTargets.add(m.group(1));
+			}
+		}
+		
+		return requireTargets;
+	}
+
+	private static String escapeUnderscore(String searchFor)
+	{
+		searchFor.replaceAll("_", "\\_");
+		return searchFor;
 	}
 
 	public static String[] locateSourceCodeOfRequiredFiles(String[] requiredFiles)
@@ -40,7 +89,15 @@ public class MyGemFunctions
 		
 		for (int i = 0; i < requiredFiles.length; i++){
 			String relativePath = requiredFiles[i];
-			requireFilePaths[i] = absolutePathToProjectsParent + File.separator + relativePath;
+			String tmpAbsoluteRelative = absolutePathToProjectsParent + File.separator + relativePath;
+			File f = new File(tmpAbsoluteRelative);
+			if (f.exists()){
+				requireFilePaths[i] = tmpAbsoluteRelative;
+			}
+			else{ // check in the lib folder of the current app... in case we're building a gem...  Also...
+				// check the gems folder
+				Process cmdProc = Runtime.getRuntime().exec("which ruby");
+			}
 		}
 		
 		return requireFilePaths;
@@ -97,6 +154,13 @@ public class MyGemFunctions
 		return absoluteProjectPath;
 	}
 	
+	private static String getProjectFolderName()
+	{
+		IWorkbenchPart workbenchPart = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().getActivePart();
+		IFile file = (IFile) workbenchPart.getSite().getPage().getActiveEditor().getEditorInput().getAdapter(IFile.class);
+		return file.getProject().getFullPath().toOSString().substring(1);
+	}
+	
 	private static String getActiveFilesText()
 	{
 		String text = null;
@@ -105,17 +169,17 @@ public class MyGemFunctions
 		IFile file = (IFile) workbenchPart.getSite().getPage().getActiveEditor().getEditorInput().getAdapter(IFile.class);
 		
 		try	{
-			text = file.getContents().toString();
+			text = convertStreamToString(file.getContents());
 		}
 		catch (CoreException e)	{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		text.getBytes().toString();
-		// FIXME look here.  
-		//file.
-		
 		return text;
+	}
+	
+	public static String convertStreamToString(InputStream is) {
+	    java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
+	    return s.hasNext() ? s.next() : "";
 	}
 	
 	
